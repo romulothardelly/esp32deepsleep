@@ -1,0 +1,10 @@
+.vscode/
+.idea/
+build/
+*.bin
+*.elf
+*.map
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
