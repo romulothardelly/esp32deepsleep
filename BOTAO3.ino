@@ -1,6 +1,7 @@
 #include "Botao.h"
 #include "Tela.h"
 #include "Blue.h"
+#include "Net.h"
 
 
 #define PINO_BOTAO GPIO_NUM_6
@@ -8,6 +9,7 @@
 
 Botao botaoMenu(6);  // criar botao na GPIO6
 Tela tela;           //Criar tela
+Net net("SATURNO24G", "19AURORA11@");
 Blue bluetooth("ESP32-S3-RGB");
 unsigned long momentoInicial;
 void dormir();
@@ -42,17 +44,26 @@ void setup() {
     }
   }
 
-   momentoInicial = millis();
 
-    // Mostra por que o ESP32 acordou.
-    esp_sleep_wakeup_cause_t motivo =
-        esp_sleep_get_wakeup_cause();
+  if (net.connect()) {
+    net.configurarHora();
 
-    if (motivo == ESP_SLEEP_WAKEUP_EXT0) {
-        Serial.println("Acordou pelo botao");
-    } else {
-        Serial.println("Ligacao normal");
-    }
+    Serial.println(net.getData());
+    Serial.println(net.getHora());
+  }
+
+
+  momentoInicial = millis();
+
+  // Mostra por que o ESP32 acordou.
+  esp_sleep_wakeup_cause_t motivo =
+    esp_sleep_get_wakeup_cause();
+
+  if (motivo == ESP_SLEEP_WAKEUP_EXT0) {
+    Serial.println("Acordou pelo botao");
+  } else {
+    Serial.println("Ligacao normal");
+  }
 }
 
 
@@ -71,17 +82,20 @@ void loop() {
     comando.toUpperCase();
 
     Serial.print("Recebido: [");
-Serial.print(comando);
-Serial.println("]");
+    Serial.print(comando);
+    Serial.println("]");
 
     if (comando == "TELA1") {
       tela.mostrar(TELA_1);
       bluetooth.enviar("Tela 1 selecionada");
+      bluetooth.enviar(net.getData());
+
     }
 
     else if (comando == "TELA2") {
       tela.mostrar(TELA_2);
       bluetooth.enviar("Tela 2 selecionada");
+      bluetooth.enviar(net.getHora());
     }
 
     else if (comando == "PROXIMA") {
@@ -95,38 +109,39 @@ Serial.println("]");
     momentoInicial = millis();
   }
   // Após 10 segundos sem interação, dorme.
-    if (millis() - momentoInicial >= TEMPO_ACORDADO) {
-        dormir();
-    }
+  if (millis() - momentoInicial >= TEMPO_ACORDADO) {
+    dormir();
+  }
 }
 
 void dormir() {
-    Serial.println("Entrando em deep sleep...");
+  Serial.println("Entrando em deep sleep...");
 
-    // Desliga visualmente o display.
-    tela.desligar();
+  // Desliga visualmente o display.
+  tela.desligar();
 
-    /*
+  net.disconnect();
+
+  /*
      * Evita entrar no sono enquanto o botão estiver pressionado.
      * Caso contrário, o nível LOW poderia provocar despertar imediato.
      */
-    while (digitalRead(PINO_BOTAO) == LOW) {
-        delay(10);
-    }
+  while (digitalRead(PINO_BOTAO) == LOW) {
+    delay(10);
+  }
 
-    /*
+  /*
      * Configura a GPIO6 para acordar o ESP32 quando ficar LOW.
      *
      * Botão ligado:
      * GPIO6 ---- botão ---- GND
      */
-    esp_sleep_enable_ext0_wakeup(
-        PINO_BOTAO,
-        0
-    );
+  esp_sleep_enable_ext0_wakeup(
+    PINO_BOTAO,
+    0);
 
-    delay(100);
+  delay(100);
 
-    // O código para aqui e o ESP32 entra em deep sleep.
-    esp_deep_sleep_start();
+  // O código para aqui e o ESP32 entra em deep sleep.
+  esp_deep_sleep_start();
 }
