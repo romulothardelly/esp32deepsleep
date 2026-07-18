@@ -90,6 +90,13 @@ public:
         return WiFi.status() == WL_CONNECTED;
     }
 
+    String getName(){
+        return WiFi.SSID();
+    }
+    String getIP(){
+        return WiFi.localIP().toString();
+    }
+
     void disconnect() {
         WiFi.disconnect();
         WiFi.mode(WIFI_OFF);

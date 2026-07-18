@@ -15,66 +15,30 @@
 #define SDA_PIN 8
 #define SCL_PIN 9
 
-enum TipoTela {
-  TELA_1,
-  TELA_2
-};
+
 
 class Tela {
 
 private:
   Adafruit_SSD1306 display;
-  TipoTela telaAtual;
 
-  void desenharTela1() {
-    display.clearDisplay();
-
+  void criarBorda() {
     display.drawRect(
       0,
       0,
       SCREEN_WIDTH,
       SCREEN_HEIGHT,
-      SSD1306_WHITE
-    );
-
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(5, 5);
-    display.println("TELA 1");
-
-    display.display();
+      SSD1306_WHITE);
   }
-
-  void desenharTela2() {
-    display.clearDisplay();
-
-    display.drawRect(
-      0,
-      0,
-      SCREEN_WIDTH,
-      SCREEN_HEIGHT,
-      SSD1306_WHITE
-    );
-
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(5, 5);
-    display.println("TELA 2");
-
-    display.display();
-  }
-
 
 
 public:
   Tela()
     : display(
-        SCREEN_WIDTH,
-        SCREEN_HEIGHT,
-        &Wire,
-        -1
-      ),
-      telaAtual(TELA_1) {
+      SCREEN_WIDTH,
+      SCREEN_HEIGHT,
+      &Wire,
+      -1){
   }
 
   bool begin() {
@@ -84,60 +48,53 @@ public:
 
     if (!display.begin(
           SSD1306_SWITCHCAPVCC,
-          SCREEN_ADDRESS
-        )) {
+          SCREEN_ADDRESS)) {
       return false;
     }
-
-    atualizar();
     return true;
   }
+ 
 
-  void atualizar() {
-    switch (telaAtual) {
-
-      case TELA_1:
-        desenharTela1();
-        break;
-
-      case TELA_2:
-        desenharTela2();
-        break;
-
-    }
-  }
-
-  void mostrar(TipoTela novaTela) {
-    telaAtual = novaTela;
-    atualizar();
-  }
-
-  void proxima() {
-    switch (telaAtual) {
-
-      case TELA_1:
-        telaAtual = TELA_2;
-        break;
-
-      case TELA_2:
-        telaAtual = TELA_1;
-        break;
-
-    }
-
-    atualizar();
-  }
   void desligar() {
     display.clearDisplay();
     display.display();
 
     display.ssd1306_command(
-        SSD1306_DISPLAYOFF
-    );
-}
+      SSD1306_DISPLAYOFF);
+  }
 
-  TipoTela atual() {
-    return telaAtual;
+
+  void escreverTexto(
+    const String& texto,
+    int x = 0,
+    int yInicial = 0,
+    int espacamento = 8) {
+    int inicio = 0;
+    int y = yInicial;
+
+    display.clearDisplay();
+    
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextWrap(false);
+
+    criarBorda();
+
+    while (inicio < texto.length()) {
+
+      int fim = texto.indexOf('\n', inicio);
+
+      if (fim == -1) {
+        fim = texto.length();
+      }
+
+      display.setCursor(x, y);
+      display.print(texto.substring(inicio, fim));
+
+      y += espacamento;
+      inicio = fim + 1;
+    }
+    display.display();
   }
 };
 
