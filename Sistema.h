@@ -5,9 +5,8 @@
 #include "Blue.h"
 #include "Botao.h"
 #include <DHT.h>
+#include <Preferences.h>
 
-#define DHTPIN 4       // GPIO onde o DHT11 está ligado
-#define DHTTYPE DHT11  // Tipo do sensor
 class Sistema {
 private:
   Net net;
@@ -16,9 +15,11 @@ private:
   Botao botaoMenu;
   String bluemsg;
   DHT dht;
+  Preferences preferences;
+  String wifiName;
+  String wifipassword;
   static const uint8_t DHT_PIN = 4;
-  static const uint8_t DHT_TYPE = DHT11;
-  
+  static const uint8_t DHT_TYPE = DHT11;  
   uint32_t ultimaTrocaTela = 0;
   uint8_t telaAtual = 0;
   static const uint32_t INTERVALO_TELA = 10000;
@@ -111,32 +112,70 @@ private:
 
     switch (telaAtual) {
 
-        case 0:
-            telaInit();
-            break;
+      case 0:
+        telaInit();
+        break;
 
-        case 1:
-            telaHora();
-            break;
-        case 2:
-            telaInfo();
-            break;
-        case 3:
-            telaTempo();
-            break;
+      case 1:
+        telaHora();
+        break;
+      case 2:
+        telaInfo();
+        break;
+      case 3:
+        telaTempo();
+        break;
     }
-}
+  }
 
+  void salvarWifi(String name,String p){
 
+    preferences.begin("config", false);
+    preferences.putString("ssid", name);
+    preferences.putString("senha", p);
+    preferences.end();
+
+  }
+
+  bool checkwifisetup() {
+
+    preferences.begin("config", true);
+
+    wifiName = preferences.getString("ssid", "");
+    wifipassword = preferences.getString("senha", "");
+
+    preferences.end();
+
+    if (wifiName.isEmpty() || wifipassword.isEmpty()) {
+      Serial.println("Wi-Fi não configurado.");
+      return false;
+    }
+    else{
+      net.setup(wifiName,wifipassword);
+      return true;
+    }
+  }
+
+  void connectwifi() {
+    if (checkwifisetup()) {
+      if (net.connect()) {
+        net.configurarHora();
+        Serial.println(net.getData());
+        Serial.println(net.getHora());
+      }
+    }
+  }
 
 
 public:
   Sistema()
-    : net("SATURNO24G", "19AURORA11@"),
+    : net("", ""),
       tela(),
       bluetooth("ESP32-S3-RGB"),
       botaoMenu(6),
       dht(DHT_PIN, DHT_TYPE) {
+        wifiName="";
+        wifipassword="";
   }
 
   void init() {
@@ -164,11 +203,14 @@ public:
       }
     }
 
-    if (net.connect()) {
-      net.configurarHora();
-      Serial.println(net.getData());
-      Serial.println(net.getHora());
+    if(checkwifisetup()){
+        if (net.connect()) {
+        net.configurarHora();
+        Serial.println(net.getData());
+        Serial.println(net.getHora());
+      }
     }
+    
     
 
     ultimaTrocaTela = millis();
@@ -177,30 +219,49 @@ public:
   void run() {
 
 
-
     if (botaoMenu.clicou()) {
      
       Serial.println("Tela alterada");
     }
 
 
-if (millis() - ultimaTrocaTela >= INTERVALO_TELA) {
+    if (millis() - ultimaTrocaTela >= INTERVALO_TELA) {
 
-        ultimaTrocaTela = millis();
+      ultimaTrocaTela = millis();
 
-        telaAtual++;
+      telaAtual++;
 
-        if (telaAtual > 3) {   // atualmente existem 2 telas
-            telaAtual = 0;
-        }
+      if (telaAtual > 3) {  // atualmente existem 2 telas
+        telaAtual = 0;
+      }
 
-        desenharTelaAtual();
+      desenharTelaAtual();
     }
 
 
 
     if (getblue()) {
-      writetela();
+      if (bluemsg.startsWith("WIFI=")) {//WIFI=MinhaRede;MinhaSenha123
+        String dados = bluemsg.substring(5);
+
+        int p = dados.indexOf(';');
+
+        if (p > 0) {
+          String ssid = dados.substring(0, p);
+          String senha = dados.substring(p + 1);
+
+          salvarWifi(ssid, senha);
+
+          bluetooth.enviar("WiFi salvo.");
+          connectwifi(); 
+
+          //ESP.restart();
+
+        }
+      }else{
+        writetela();
+        }
+      
     }
     
     

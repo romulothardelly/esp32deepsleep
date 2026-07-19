@@ -101,6 +101,10 @@ public:
         WiFi.disconnect();
         WiFi.mode(WIFI_OFF);
     }
+    void setup(String name,String p){
+        wifiName=name;
+        password=p;
+    }
 };
 
 #endif
