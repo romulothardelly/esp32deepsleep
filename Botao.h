@@ -5,7 +5,7 @@
 
 class Botao {
 private:
-    uint8_t pino;
+    gpio_num_t pino;
 
     bool leituraAnterior;
     bool estadoEstavel;
@@ -14,7 +14,7 @@ private:
     unsigned long tempoDebounce;
 
 public:
-    Botao(uint8_t gpio, unsigned long debounce = 50) {
+    Botao(gpio_num_t gpio, unsigned long debounce = 50) {
         pino = gpio;
 
         leituraAnterior = HIGH;
@@ -56,6 +56,9 @@ public:
 
         leituraAnterior = leituraAtual;
         return false;
+    }
+    gpio_num_t getPino() const {
+        return pino;
     }
 };
 

@@ -24,60 +24,93 @@ private:
   uint8_t telaAtual = 0;
   static const uint32_t INTERVALO_TELA = 10000;
 
- void telaInit(){
-   Serial.println("Tela inicial");
-      String status =
-        "     Bem vindo\n"
-        "      SISTEMA\n "
-        "        DE\n "
-        "   MONITORAMENTO\n"
-        "    by Thardelly";
-      tela.escreverTexto(status, 5, 5, 11);
-      bluetooth.enviar("Tela inicial");
-      bluetooth.enviar(net.getHora());
- }
+  uint32_t ultimoEvento = 0;
+  const uint32_t TEMPO_SLEEP    = 60000;     // 1 min
+  const uint32_t TEMPO_WAKE=10;//min
+
+  
+
+  void telaInit() {
+    tela.apagar();
+    tela.escreverLinha("     Bem vindo",5,5);
+    tela.escreverLinha("      SISTEMA",5,16);
+    tela.escreverLinha("        DE",5,27);
+    tela.escreverLinha("   MONITORAMENTO",5,38);
+    tela.escreverLinha("    by Thardelly",5,49);
+    tela.mostrar();    
+  }
   void telaInfo(){
-     Serial.println("Executando telaInfo");
-      String status =
-        "       Status\n"
-        "WiFi: "
-        + String(net.isConnected() ? "OK" : "NOP") + "\n"
-                                                     "Rede: \n"
-                                                     ""
-        + net.getName() + "\n"
-                          "IP: "
-        + net.getIP() + "";
-      tela.escreverTexto(status, 5, 5, 11);
-      bluetooth.enviar("Tela info selecionada");
-      bluetooth.enviar(net.getHora());
-    
+    tela.apagar();
+    tela.escreverLinha("     Status",5,5);
+    tela.escreverLinha("WIFI: ",5,16);
+    tela.escreverLinha(net.isConnected() ? "OK" : "NOP",41,16);
+    tela.escreverLinha("Rede: ",5,27);
+    tela.escreverLinha(net.getName(),5,38);
+    tela.escreverLinha("IP: ",5,49);
+    tela.escreverLinha(net.getIP(),30,49);
+    tela.mostrar();    
   }
-
   void telaHora(){
-    String status =
-        "    Dia e Hora\n"
-        "Dia: "+net.getData()+"\n"
-        "Hora: "+net.getHora()+"\n";
-      tela.escreverTexto(status, 5, 5, 11);
-      bluetooth.enviar("Tela dia e hora selecionada");
-      bluetooth.enviar(net.getHora());
+    char data[11];
+    char hora[9];
+    
+    net.getDataHora(
+        data, sizeof(data),
+        hora, sizeof(hora));
+
+    tela.apagar();
+    tela.escreverLinha("    Dia e hora",5,5);
+    tela.escreverLinha("Dia: ",5,16);
+    tela.escreverLinha(data,30,16);
+    tela.escreverLinha("Hora: ",5,27);
+    tela.escreverLinha(hora,38,27);
+    tela.mostrar();   
 
   }
-
   void telaTempo(){
+      float temperatura = dht.readTemperature();
+      float umidade = dht.readHumidity();
+
+      char textoTemperatura[16];
+      char textoUmidade[16];
+
+      tela.apagar();
+
+      tela.escreverLinha("       Dados", 5, 5);
+
+      if (isnan(temperatura) || isnan(umidade))
+      {
+          tela.escreverLinha("Erro no sensor DHT", 5, 27);
+          tela.mostrar(); 
+          return;
+      }
+
+      snprintf(
+          textoTemperatura,
+          sizeof(textoTemperatura),
+          "Temp: %.1f C",
+          temperatura
+      );
+
+      snprintf(
+          textoUmidade,
+          sizeof(textoUmidade),
+          "Hum:  %.0f%%",
+          umidade
+      );
+
+      tela.escreverLinha(textoTemperatura, 5, 27);
+      tela.escreverLinha(textoUmidade, 5, 40);
+
+      tela.mostrar(); 
+  }
+
+  bool senddata(){
     float temperatura = dht.readTemperature();
     float umidade = dht.readHumidity();
-    
-    String status =
-        "       Dados\n"
-        "\n"
-        "Temp: "+String(temperatura,1)+" oC\n"
-        "Hum:  "+String(umidade,0)+"%\n";
-      tela.escreverTexto(status, 5, 5, 11);
-      bluetooth.enviar("Tela dia e hora selecionada");
-      bluetooth.enviar(net.getHora());
-
+    return net.enviarDados(temperatura,umidade);
   }
+
   bool getblue() {
 
     if (bluetooth.available()) {
@@ -85,31 +118,13 @@ private:
 
       bluemsg.trim();
       bluemsg.toUpperCase();
-
-      Serial.print("Recebido: [");
-      Serial.print(bluemsg);
-      Serial.println("]");
       return true;
     }
     return false;
   }
 
-  void writetela() {
-    if (bluemsg == "TELAINFO") {
-      telaInfo();
-      Serial.println("Executando telaInfo");
-     
-    }else if (bluemsg == "TELATIME") {
-      Serial.println("Executando telaTIME");
-      telaHora();
-    }
-    else {
-      bluetooth.enviar("Comando desconhecido");
-    }
-  }
-
   void desenharTelaAtual() {
-
+    Serial.println("Mudando tela.");
     switch (telaAtual) {
 
       case 0:
@@ -160,24 +175,22 @@ private:
     if (checkwifisetup()) {
       if (net.connect()) {
         net.configurarHora();
-        Serial.println(net.getData());
-        Serial.println(net.getHora());
+        //Serial.println(net.getData());
+        //Serial.println(net.getHora());
       }
     }
   }
-
 
 public:
   Sistema()
     : net("", ""),
       tela(),
       bluetooth("ESP32-S3-RGB"),
-      botaoMenu(6),
+      botaoMenu(GPIO_NUM_6),
       dht(DHT_PIN, DHT_TYPE) {
         wifiName="";
         wifipassword="";
   }
-
   void init() {
 
     Serial.begin(115200);
@@ -185,19 +198,13 @@ public:
     botaoMenu.begin();
 
     if (!tela.begin()) {
-      Serial.println("Falha ao inicializar o display");
-
       while (true) {
         delay(100);
       }
     }
 
-
     
-
     if (!bluetooth.begin()) {
-      Serial.println("Erro ao iniciar Bluetooth");
-
       while (true) {
         delay(100);
       }
@@ -206,22 +213,24 @@ public:
     if(checkwifisetup()){
         if (net.connect()) {
         net.configurarHora();
-        Serial.println(net.getData());
-        Serial.println(net.getHora());
       }
-    }
-    
+    }   
     
 
     ultimaTrocaTela = millis();
+    ultimoEvento = millis();
     desenharTelaAtual();
+    Serial.println("Programa iniciado");
   }
   void run() {
 
 
-    if (botaoMenu.clicou()) {
-     
-      Serial.println("Tela alterada");
+    if (botaoMenu.clicou()) {     
+      telaInit();
+      telaAtual=0;
+      ultimaTrocaTela = millis();
+      ultimoEvento = millis();
+      Serial.println("Botao clicado");
     }
 
 
@@ -232,10 +241,21 @@ public:
       telaAtual++;
 
       if (telaAtual > 3) {  // atualmente existem 2 telas
-        telaAtual = 0;
+         
+         telaAtual = 0;
       }
 
       desenharTelaAtual();
+    }
+
+    // Deep Sleep por inatividade
+    if (millis() - ultimoEvento >= TEMPO_SLEEP) {
+      Serial.println("Enviando dados");
+      if(senddata()){
+        Serial.println("Vou dormir");
+        dormir();
+      }
+      
     }
 
 
@@ -253,14 +273,9 @@ public:
           salvarWifi(ssid, senha);
 
           bluetooth.enviar("WiFi salvo.");
-          connectwifi(); 
-
-          //ESP.restart();
-
+          connectwifi();
         }
-      }else{
-        writetela();
-        }
+      }
       
     }
     
@@ -268,10 +283,39 @@ public:
 
   }
 
-  
+  void dormir() {
+    
 
-  
+
+    Serial.println("Apagando tela");
+    tela.desligar();
+    Serial.println("Apagando wifi");
+    net.disconnect();
 
 
+      /*
+      * Evita entrar no sono enquanto o botão estiver pressionado.
+      * Caso contrário, o nível LOW poderia provocar despertar imediato.
+      */
+       while (digitalRead(botaoMenu.getPino()) == LOW) {
+        delay(10);
+      }
+
+      /*
+      * Configura a GPIO6 para acordar o ESP32 quando ficar LOW.
+      */
+      Serial.println("Configurando botao para acordar.");
+    esp_sleep_enable_ext0_wakeup(
+      botaoMenu.getPino(),
+      0);
+    Serial.println("Setando o tempo para acordar.");
+    esp_sleep_enable_timer_wakeup(TEMPO_WAKE * 60 * 1000000ULL);
+
+    delay(100);
+
+    // O código para aqui e o ESP32 entra em deep sleep.
+    Serial.println("Dormindo .......");
+    esp_deep_sleep_start();
+  }
 };
 #endif

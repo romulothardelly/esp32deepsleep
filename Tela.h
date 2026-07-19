@@ -21,6 +21,8 @@ class Tela {
 
 private:
   Adafruit_SSD1306 display;
+  static const uint16_t COR_PADRAO = SSD1306_WHITE;
+  static const uint8_t TAMANHO_PADRAO = 1;
 
   void criarBorda() {
     display.drawRect(
@@ -51,10 +53,11 @@ public:
           SCREEN_ADDRESS)) {
       return false;
     }
+
+    display.setTextColor(COR_PADRAO);
+    display.setTextSize(TAMANHO_PADRAO);
     return true;
   }
- 
-
   void desligar() {
     display.clearDisplay();
     display.display();
@@ -62,40 +65,22 @@ public:
     display.ssd1306_command(
       SSD1306_DISPLAYOFF);
   }
-
-
-  void escreverTexto(
-    const String& texto,
-    int x = 0,
-    int yInicial = 0,
-    int espacamento = 8) {
-    int inicio = 0;
-    int y = yInicial;
-
+  void escreverLinha(const char* texto,int x,int y){
+    display.setCursor(x, y);
+    //display.setTextColor(cor);
+   // display.setTextSize(tamanho);
+    display.print(texto);
+ }
+  void escreverLinha(const String& texto, int x, int y){
+    escreverLinha(texto.c_str(), x, y);
+  }
+  void apagar(){
     display.clearDisplay();
-    
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-    display.setTextWrap(false);
-
-    criarBorda();
-
-    while (inicio < texto.length()) {
-
-      int fim = texto.indexOf('\n', inicio);
-
-      if (fim == -1) {
-        fim = texto.length();
-      }
-
-      display.setCursor(x, y);
-      display.print(texto.substring(inicio, fim));
-
-      y += espacamento;
-      inicio = fim + 1;
-    }
+  }
+  void mostrar(){
     display.display();
   }
+
 };
 
 #endif
