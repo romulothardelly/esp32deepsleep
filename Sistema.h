@@ -27,8 +27,57 @@ private:
   uint32_t ultimoEvento = 0;
   const uint32_t TEMPO_SLEEP    = 60000;     // 1 min
   const uint32_t TEMPO_WAKE=10;//min
+  const uint64_t UM_SEGUNDO = 1000000ULL;
+  uint32_t LASTCICLE = 0;
+  uint8_t CICLE=0;
+  float temperatures[3];
+  float humidities[3];
+  bool dataok=false;
 
-  
+  void readsensor(uint8_t i) {
+    temperatures[i] = dht.readTemperature();
+    humidities[i] = dht.readHumidity();
+  }
+
+  bool checktemp() {
+    float minimo = temperatures[0];
+    float maximo = temperatures[0];
+
+    for (uint8_t i = 1; i < 3; i++) {
+      if (temperatures[i] < minimo) minimo = temperatures[i];
+      if (temperatures[i] > maximo) maximo = temperatures[i];
+    }
+
+    if (maximo - minimo <= 0.5f) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  bool checkhumid() {
+    float minimo = humidities[0];
+    float maximo = humidities[0];
+
+    for (uint8_t i = 1; i < 3; i++) {
+      if (humidities[i] < minimo) minimo = humidities[i];
+      if (humidities[i] > maximo) maximo = humidities[i];
+    }
+
+    if (maximo - minimo <= 0.5f) {
+      return true;
+    }
+
+    return false;
+  }
+
+  bool checkdata(){
+    if (checktemp() && checkhumid()){
+      return true;
+    }
+    return false;
+
+  }
 
   void telaInit() {
     tela.apagar();
@@ -106,9 +155,7 @@ private:
   }
 
   bool senddata(){
-    float temperatura = dht.readTemperature();
-    float umidade = dht.readHumidity();
-    return net.enviarDados(temperatura,umidade);
+    return net.enviarDados(temperatures[0],humidities[0]);
   }
 
   bool getblue() {
@@ -219,24 +266,34 @@ public:
 
     ultimaTrocaTela = millis();
     ultimoEvento = millis();
-    desenharTelaAtual();
+    //desenharTelaAtual();
+    tela.desligar();
     Serial.println("Programa iniciado");
+    dataok=false;
+    CICLE=0;
+    temperatures[0] = 1;
+    temperatures[1] = 2;
+    temperatures[2] = 3;
+    humidities[0]=1;
+    humidities[1]=2;
+    humidities[2]=3;
   }
   void run() {
 
+    uint32_t now = millis();
 
     if (botaoMenu.clicou()) {     
-      telaInit();
-      telaAtual=0;
-      ultimaTrocaTela = millis();
-      ultimoEvento = millis();
+      //telaInit();
+      //telaAtual=0;
+      //ultimaTrocaTela = millis();
+      //ultimoEvento = millis();
       Serial.println("Botao clicado");
     }
 
+/*
+    if (now - ultimaTrocaTela >= INTERVALO_TELA) {
 
-    if (millis() - ultimaTrocaTela >= INTERVALO_TELA) {
-
-      ultimaTrocaTela = millis();
+      ultimaTrocaTela = now;
 
       telaAtual++;
 
@@ -247,9 +304,20 @@ public:
 
       desenharTelaAtual();
     }
+*/
+    if (now - LASTCICLE >= 2000) {     
+      readsensor(CICLE);
+      CICLE++;
+      Serial.printf("Lendo sensor no Ciclo%d\n",CICLE);
+      if (CICLE >= 3) {
+        CICLE = 0;
+        dataok=checkdata();        
+      }
+      LASTCICLE = now;
+    }
 
     // Deep Sleep por inatividade
-    if (millis() - ultimoEvento >= TEMPO_SLEEP) {
+    if (dataok) {
       Serial.println("Enviando dados");
       if(senddata()){
         Serial.println("Vou dormir");
@@ -288,7 +356,7 @@ public:
 
 
     Serial.println("Apagando tela");
-    tela.desligar();
+    //tela.desligar();
     Serial.println("Apagando wifi");
     net.disconnect();
 
@@ -309,7 +377,8 @@ public:
       botaoMenu.getPino(),
       0);
     Serial.println("Setando o tempo para acordar.");
-    esp_sleep_enable_timer_wakeup(TEMPO_WAKE * 60 * 1000000ULL);
+    //esp_sleep_enable_timer_wakeup(TEMPO_WAKE * 60 * 1000000ULL);
+    esp_sleep_enable_timer_wakeup(60ULL*UM_SEGUNDO*10);
 
     delay(100);
 
